@@ -20,3 +20,6 @@
 
 * Open jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file.
 
+### Citation: 
+
+* Some of this code was generated with AI.
