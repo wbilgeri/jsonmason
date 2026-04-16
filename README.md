@@ -16,7 +16,7 @@
 * Single HTML file has no dependencies. Source can be viewed in a text editor.
 * Most editors struggle with larger JSON files.
 
-* ### Usage: 
+### Usage: 
 
 * Open jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file.
 
