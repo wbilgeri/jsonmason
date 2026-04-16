@@ -1457,9 +1457,13 @@
             e.stopPropagation();
             if (path.length === 0) return;
             const parent = getDataAtPath(path.slice(0, -1));
-            parent[path[path.length - 1]] = !data;
+            const k = path[path.length - 1];
+            const newVal = !parent[k];   // read from model, not stale closure
+            parent[k] = newVal;
+            val.textContent = String(newVal);
+            const entry = nodeMap.get(JSON.stringify(path));
+            if (entry) entry.data = newVal;
             markDirty();
-            renderTree(rootData);
           });
         } else if (type !== 'null') {
           // String/number: double-click to edit inline
@@ -1467,7 +1471,7 @@
           val.title = 'Double-click to edit';
           val.addEventListener('dblclick', (e) => {
             e.stopPropagation();
-            startInlineValueEdit(val, path, data, type);
+            startInlineValueEdit(val, path);  // path only — reads current data from model
           });
         } else {
           // null: double-click opens change-type modal
@@ -1514,34 +1518,57 @@
       const row = kEl.closest('.node-row');
       if (row) row.classList.add('edit-active');
 
-      let confirmed = false;
-      const confirm = () => {
-        if (confirmed) return;
-        confirmed = true;
+      // Restore the original span without re-rendering the tree
+      const restore = () => {
+        if (row) row.classList.remove('edit-active');
+        input.replaceWith(kEl);
+      };
+
+      let done = false;
+      const commit = () => {
+        if (done) return;
+        done = true;
         if (row) row.classList.remove('edit-active');
         const newKey = input.value.trim();
-        if (!newKey || newKey === currentKey) { renderTree(rootData); return; }
-        if (newKey in parent && newKey !== currentKey) {
+        // No change or empty — just put the span back
+        if (!newKey || newKey === currentKey) { input.replaceWith(kEl); return; }
+        if (newKey in parent) {
           alert(`Key "${newKey}" already exists.`);
-          renderTree(rootData);
+          input.replaceWith(kEl);
           return;
         }
         const entries = Object.entries(parent);
         const idx = entries.findIndex(([k]) => k === currentKey);
-        if (idx === -1) { renderTree(rootData); return; }
+        if (idx === -1) { input.replaceWith(kEl); return; }
         entries[idx] = [newKey, entries[idx][1]];
         Object.keys(parent).forEach(k => delete parent[k]);
         entries.forEach(([k, v]) => { parent[k] = v; });
         markDirty();
+        // Re-render is unavoidable (child event listeners close over old paths),
+        // but preserve scroll position and bring the renamed row into view.
+        const panel = document.getElementById('tree-panel');
+        const scrollTop = panel.scrollTop;
         renderTree(rootData);
+        panel.scrollTop = scrollTop;
+        const newPath = [...path.slice(0, -1), newKey];
+        const newPathStr = JSON.stringify(newPath);
+        const editedRow = [...document.querySelectorAll('[data-path]')]
+          .find(el => el.getAttribute('data-path') === newPathStr);
+        if (editedRow) editedRow.scrollIntoView({ block: 'nearest' });
+      };
+
+      const cancel = () => {
+        if (done) return;
+        done = true;
+        restore();
       };
 
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); confirm(); }
-        if (e.key === 'Escape') { confirmed = true; if (row) row.classList.remove('edit-active'); renderTree(rootData); }
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { cancel(); }
         e.stopPropagation();
       });
-      input.addEventListener('blur', confirm);
+      input.addEventListener('blur', commit);
       input.addEventListener('click', e => e.stopPropagation());
       input.addEventListener('dblclick', e => e.stopPropagation());
 
@@ -1551,8 +1578,15 @@
     }
 
     // ---- Inline value editing ----
-    function startInlineValueEdit(valEl, path, currentData, type) {
+    // Signature intentionally takes only `path` — current data is read from the
+    // model at call-time so repeated edits never use a stale closure value.
+    function startInlineValueEdit(valEl, path) {
       if (path.length === 0) return;
+      const parent = getDataAtPath(path.slice(0, -1));
+      const key = path[path.length - 1];
+      const currentData = parent[key];
+      const type = getType(currentData);
+      if (type === 'null' || type === 'object' || type === 'array') return;
 
       const input = document.createElement('input');
       input.className = 'inline-edit val-' + type + '-edit';
@@ -1564,14 +1598,13 @@
       const row = valEl.closest('.node-row');
       if (row) row.classList.add('edit-active');
 
-      let confirmed = false;
-      const confirm = () => {
-        if (confirmed) return;
-        confirmed = true;
+      let done = false;
+
+      const commit = () => {
+        if (done) return;
+        done = true;
         if (row) row.classList.remove('edit-active');
         const raw = input.value;
-        const parent = getDataAtPath(path.slice(0, -1));
-        const key = path[path.length - 1];
         let parsed;
         if (type === 'number') {
           const num = Number(raw);
@@ -1579,18 +1612,33 @@
         } else {
           parsed = raw;
         }
-        if (parsed === currentData) { renderTree(rootData); return; }
+        // No change — restore span as-is, no re-render needed
+        if (parsed === currentData) { input.replaceWith(valEl); return; }
         parent[key] = parsed;
+        // Update the span in-place so the tree doesn't move at all
+        const newType = typeof parsed === 'number' ? 'number' : 'string';
+        valEl.className = 'node-val val-' + newType + ' editable';
+        valEl.textContent = String(parsed);
+        // Keep nodeMap in sync so search results stay accurate
+        const entry = nodeMap.get(JSON.stringify(path));
+        if (entry) entry.data = parsed;
         markDirty();
-        renderTree(rootData);
+        input.replaceWith(valEl);
+      };
+
+      const cancel = () => {
+        if (done) return;
+        done = true;
+        if (row) row.classList.remove('edit-active');
+        input.replaceWith(valEl);
       };
 
       input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); confirm(); }
-        if (e.key === 'Escape') { confirmed = true; if (row) row.classList.remove('edit-active'); renderTree(rootData); }
+        if (e.key === 'Enter') { e.preventDefault(); commit(); }
+        if (e.key === 'Escape') { cancel(); }
         e.stopPropagation();
       });
-      input.addEventListener('blur', confirm);
+      input.addEventListener('blur', commit);
       input.addEventListener('click', e => e.stopPropagation());
       input.addEventListener('dblclick', e => e.stopPropagation());
 
@@ -1906,25 +1954,30 @@
 
     function ctxEditValueFromMenu() {
       if (!ctxNode) return;
-      const { data, path, row } = ctxNode;
-      const type = getType(data);
+      const { path, row } = ctxNode;
+      const type = getType(getDataAtPath(path));
       closeCtx();
       if (type === 'boolean') {
-        // Toggle
+        // Toggle in-place — same logic as the click handler on the val span
         if (path.length > 0) {
           const parent = getDataAtPath(path.slice(0, -1));
-          parent[path[path.length - 1]] = !data;
+          const k = path[path.length - 1];
+          const newVal = !parent[k];
+          parent[k] = newVal;
+          const valSpan = row.querySelector('.node-val.val-boolean');
+          if (valSpan) valSpan.textContent = String(newVal);
+          const entry = nodeMap.get(JSON.stringify(path));
+          if (entry) entry.data = newVal;
           markDirty();
-          renderTree(rootData);
         }
         return;
       }
       if (type === 'null' || type === 'object' || type === 'array') {
-        openNodeModal('edit-val', path, data);
+        openNodeModal('edit-val', path, getDataAtPath(path));
         return;
       }
       const valEl = row.querySelector('.node-val.editable');
-      if (valEl) startInlineValueEdit(valEl, path, data, type);
+      if (valEl) startInlineValueEdit(valEl, path);
     }
 
     function ctxAddChildFromMenu() {
