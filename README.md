@@ -1,4 +1,4 @@
-# JSON Mason
+# 🧱 JSON Mason
 ## A lightweight JSON viewer and editor. 
 ###### Use your browser to view and edit JSON files.
 
