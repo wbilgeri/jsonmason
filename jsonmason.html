@@ -1025,7 +1025,7 @@
   </div>
 
   <div id="toolbar">
-    <h1>&#123;🧱 JSON Mason &#125;</h1>
+    <h1>🧱 JSON Mason</h1>
     <div class="toolbar-sep"></div>
     <button class="tb-btn" onclick="expandAllGuarded()">Expand all</button>
     <button class="tb-btn" onclick="collapseAll()">Collapse all</button>
@@ -1053,6 +1053,7 @@
     <span id="status-type"></span>
     <span id="status-size"></span>
     <span id="status-clipboard">📋 Branch copied</span>
+    <span id="status-version" style="margin-left: auto;">v0.2.0</span>
   </div>
 
   <div id="dl-toast"></div>
@@ -1545,10 +1546,10 @@
         val.className = 'node-val val-' + type;
         val.textContent = data === null ? 'null' : String(data);
 
-        // Boolean: single click toggles
+        // Boolean: double click toggles
         if (type === 'boolean') {
-          val.title = 'Click to toggle';
-          val.addEventListener('click', (e) => {
+          val.title = 'Double-click to toggle';
+          val.addEventListener('dblclick', (e) => {
             e.stopPropagation();
             if (path.length === 0) return;
             const parent = getDataAtPath(path.slice(0, -1));
