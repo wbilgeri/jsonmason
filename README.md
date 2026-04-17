@@ -1,6 +1,6 @@
 # 🧱 JSON Mason
-## A lightweight JSON viewer and editor. 
-###### Use your browser to view and edit JSON files.
+## A lightweight JSON viewer, builder and editor. 
+###### Use your browser to view, build and edit JSON files.
 
 
 
@@ -18,7 +18,7 @@
 
 ### Usage: 
 
-* Open jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file.
+* Open jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file. Additional help is available in the app. 
 
 ### Citation: 
 
