@@ -1001,6 +1001,84 @@
     .fmt-pill.active .fmt-pill-sub {
       color: #7ab8e8;
     }
+
+    /* ---- HELP MODAL ---- */
+    .help-scroll::-webkit-scrollbar { width: 6px; }
+    .help-scroll::-webkit-scrollbar-track { background: transparent; }
+    .help-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
+
+    .help-section {
+      margin-bottom: 18px;
+    }
+
+    .help-heading {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 6px;
+      letter-spacing: 0.2px;
+    }
+
+    .help-body {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.65;
+    }
+
+    .help-body strong {
+      color: var(--text);
+    }
+
+    .help-body code {
+      font-family: 'Consolas', monospace;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 12px;
+      color: var(--accent3);
+    }
+
+    kbd {
+      font-family: 'Consolas', monospace;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      color: var(--text);
+    }
+
+    .help-list {
+      margin: 8px 0 0 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .help-table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .help-table td {
+      padding: 5px 10px 5px 0;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 13px;
+    }
+
+    .help-table td:first-child {
+      white-space: nowrap;
+      width: 1%;
+    }
+
+    .help-table tr:last-child td {
+      border-bottom: none;
+    }
   </style>
 </head>
 
@@ -1039,6 +1117,7 @@
     <button class="tb-btn" onclick="loadNewFile()">&#128194; Open file</button>
     <button class="tb-btn" id="save-btn" onclick="saveEditedJson()" style="display:none">&#128190; Save JSON</button>
     <span id="file-info"></span>
+    <button class="tb-btn" onclick="openHelp()" style="margin-left:4px;" title="Help & keyboard shortcuts">❓ Help</button>
   </div>
 
   <div id="main">
@@ -1053,7 +1132,7 @@
     <span id="status-type"></span>
     <span id="status-size"></span>
     <span id="status-clipboard">📋 Branch copied</span>
-    <span id="status-version" style="margin-left: auto;">v0.2.0</span>
+    <span id="status-version" style="margin-left: auto;">v0.2.1</span>
   </div>
 
   <div id="dl-toast"></div>
@@ -1088,6 +1167,108 @@
       </div>
     </div>
   </div>
+  <!-- Help Modal -->
+  <div id="help-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeHelp()">
+    <div class="modal-box" style="max-width:620px;width:95%;text-align:left;max-height:85vh;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-size:17px;font-weight:700;color:var(--text);">🧱 JSON Mason — Help</div>
+        <button class="modal-btn cancel" onclick="closeHelp()" style="padding:3px 10px;font-size:13px;">✕</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;padding-right:4px;" class="help-scroll">
+
+        <div class="help-section">
+          <div class="help-heading">📂 Loading a File</div>
+          <div class="help-body">
+            Drop any <code>.json</code> file onto the drop zone, or click it to browse. Once a file is loaded, use the <strong>Open file</strong> button in the toolbar to load a different one. Large files show a progress bar while parsing.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">🌲 Navigating the Tree</div>
+          <div class="help-body">
+            Click the <strong>▶ triangle</strong> next to any object or array to expand or collapse it. Use the toolbar depth buttons — <strong>Depth 1 / 2 / 3</strong> — to show only the top levels, or <strong>Expand all / Collapse all</strong> to toggle everything at once. For very large trees a warning will appear before rendering to avoid freezing the browser.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">🔍 Search</div>
+          <div class="help-body">
+            Type in the <strong>Search</strong> box to highlight all nodes whose key or value contains your query. Press <kbd>Enter</kbd> to jump to the next match, <kbd>Shift + Enter</kbd> for the previous match. The match counter shows <em>current / total</em>.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">✏️ Editing Values & Keys</div>
+          <div class="help-body">
+            <strong>Double-click</strong> any value to edit it inline. An input field appears — press <kbd>Enter</kbd> to confirm or <kbd>Escape</kbd> to cancel. <strong>Double-click</strong> a key name to rename it. <strong>Boolean</strong> values can be toggled with a single click. The <strong>💾 Save JSON *</strong> button lights up whenever there are unsaved changes.
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">➕ Adding &amp; Removing Nodes</div>
+          <div class="help-body">
+            Hover over any object or array row to reveal the <strong>+</strong> button on the right — click it to add a new child. You can also right-click any node and choose <strong>Add child node</strong>. To delete a node, right-click it and choose <strong>Delete node</strong> (shown in red).
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">📋 Right-Click Context Menu</div>
+          <div class="help-body">
+            Right-click any node to access the full action menu:
+            <ul class="help-list">
+              <li><strong>Save branch as JSON</strong> — download just this subtree as a <code>.json</code> file.</li>
+              <li><strong>Save array as JSONL</strong> — available on array nodes; saves each item as a newline-delimited JSON record.</li>
+              <li><strong>Copy path</strong> — copies the dot-notation path (e.g. <code>data.users[0].name</code>) to the clipboard.</li>
+              <li><strong>Copy value / Copy key</strong> — copies the raw value or key string.</li>
+              <li><strong>Rename key / Edit value</strong> — same as double-clicking.</li>
+              <li><strong>Copy branch / Paste into node</strong> — internal clipboard for moving subtrees around.</li>
+              <li><strong>Duplicate node</strong> — inserts a copy of the node next to the original.</li>
+              <li><strong>Expand / Collapse subtree</strong> — expands or collapses the entire subtree under this node.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">💾 Saving Your Work</div>
+          <div class="help-body">
+            Click <strong>💾 Save JSON</strong> (or <strong>💾 Save JSON *</strong> when there are unsaved edits). A dialog lets you choose the filename and format: <strong>Pretty</strong> (2-space indented, human-readable) or <strong>Compact</strong> (minified, no whitespace).
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">⌨️ Keyboard Shortcuts</div>
+          <div class="help-body">
+            <table class="help-table">
+              <tr><td><kbd>Enter</kbd></td><td>Confirm inline edit / next search match</td></tr>
+              <tr><td><kbd>Shift + Enter</kbd></td><td>Previous search match</td></tr>
+              <tr><td><kbd>Escape</kbd></td><td>Cancel inline edit / close modal</td></tr>
+              <tr><td><kbd>?</kbd></td><td>Open this help panel</td></tr>
+              <tr><td>Double-click value</td><td>Edit value inline</td></tr>
+              <tr><td>Double-click key</td><td>Rename key</td></tr>
+              <tr><td>Click boolean</td><td>Toggle true / false</td></tr>
+              <tr><td>Right-click node</td><td>Open context menu</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div class="help-section">
+          <div class="help-heading">🎨 Value Colour Guide</div>
+          <div class="help-body">
+            <span style="color:var(--str)">■</span> <strong>Strings</strong> &nbsp;·&nbsp;
+            <span style="color:var(--num)">■</span> <strong>Numbers</strong> &nbsp;·&nbsp;
+            <span style="color:var(--bool)">■</span> <strong>Booleans</strong> &nbsp;·&nbsp;
+            <span style="color:var(--null)">■</span> <strong>Null</strong> &nbsp;·&nbsp;
+            <span style="color:var(--key)">■</span> <strong>Keys</strong>
+          </div>
+        </div>
+
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end;">
+        <button class="modal-btn primary" onclick="closeHelp()">Got it</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Context Menu -->
   <div id="ctx-menu">
     <div class="ctx-item" onclick="ctxSaveBranch('json')">
@@ -1958,7 +2139,8 @@
 
     document.addEventListener('click', closeCtx);
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') { closeCtx(); warnCancel(); promptCancel(); nmCancel(); closeSaveModal(); }
+      if (e.key === 'Escape') { closeCtx(); warnCancel(); promptCancel(); nmCancel(); closeSaveModal(); closeHelp(); }
+      if (e.key === '?' && !e.target.matches('input,textarea')) { e.preventDefault(); openHelp(); }
     });
 
     // ---- Context menu action handlers ----
@@ -2397,6 +2579,14 @@
       document.getElementById('status-path').textContent = path || '(root)';
       document.getElementById('status-type').textContent = type || '';
       document.getElementById('status-size').textContent = extra || '';
+    }
+
+    // ---- Help modal ----
+    function openHelp() {
+      document.getElementById('help-modal').classList.remove('hidden');
+    }
+    function closeHelp() {
+      document.getElementById('help-modal').classList.add('hidden');
     }
 
     // ---- Download helper ----
