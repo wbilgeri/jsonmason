@@ -430,7 +430,6 @@
       padding: 1px 6px;
       outline: none;
       min-width: 50px;
-      max-width: 500px;
       vertical-align: middle;
     }
 
@@ -444,6 +443,26 @@
 
     .inline-edit.val-number-edit {
       color: var(--num);
+    }
+
+    /* Textarea variant for multiline string editing */
+    .inline-edit-area {
+      background: var(--bg3);
+      border: 1px solid var(--accent);
+      border-radius: 3px;
+      color: var(--str);
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 13px;
+      padding: 1px 6px;
+      outline: none;
+      min-width: 80px;
+      resize: none;
+      overflow: hidden;
+      vertical-align: top;
+      display: inline-block;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal;
     }
 
     /* ADD NODE BUTTON on row */
@@ -484,11 +503,18 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
       font-size: 13px;
       display: none;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     #ctx-menu.visible {
       display: block;
     }
+
+    #ctx-menu::-webkit-scrollbar { width: 6px; }
+    #ctx-menu::-webkit-scrollbar-track { background: transparent; }
+    #ctx-menu::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
 
     .ctx-item {
       padding: 7px 16px;
@@ -1002,6 +1028,20 @@
       color: #7ab8e8;
     }
 
+    .fmt-pill-size {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      font-family: 'Consolas', monospace;
+      color: var(--text2);
+      font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+
+    .fmt-pill.active .fmt-pill-size {
+      color: #7ab8e8;
+    }
+
     /* ---- HELP MODAL ---- */
     .help-scroll::-webkit-scrollbar { width: 6px; }
     .help-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -1116,6 +1156,8 @@
     <div class="toolbar-sep"></div>
     <button class="tb-btn" onclick="loadNewFile()">&#128194; Open file</button>
     <button class="tb-btn" id="save-btn" onclick="saveEditedJson()" style="display:none">&#128190; Save JSON</button>
+    <button class="tb-btn" id="undo-btn" onclick="undoEdit()" style="display:none" title="Undo last edit (Ctrl+Z)">&#8617; Undo</button>
+    <button class="tb-btn" id="redo-btn" onclick="redoEdit()" style="display:none" title="Redo (Ctrl+Shift+Z)">&#8618; Redo</button>
     <span id="file-info"></span>
     <button class="tb-btn" onclick="openHelp()" style="margin-left:4px;" title="Help & keyboard shortcuts">❓ Help</button>
   </div>
@@ -1132,7 +1174,6 @@
     <span id="status-type"></span>
     <span id="status-size"></span>
     <span id="status-clipboard">📋 Branch copied</span>
-    <span id="status-version" style="margin-left: auto;">v0.2.1</span>
   </div>
 
   <div id="dl-toast"></div>
@@ -1153,10 +1194,12 @@
           <button class="fmt-pill active" id="save-fmt-pretty" onclick="setSaveFormat('pretty')">
             Pretty
             <span class="fmt-pill-sub">2-space indentation</span>
+            <span class="fmt-pill-size" id="save-size-pretty"></span>
           </button>
           <button class="fmt-pill" id="save-fmt-compact" onclick="setSaveFormat('compact')">
             Compact
             <span class="fmt-pill-sub">whitespace removed</span>
+            <span class="fmt-pill-size" id="save-size-compact"></span>
           </button>
         </div>
       </div>
@@ -1171,7 +1214,7 @@
   <div id="help-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeHelp()">
     <div class="modal-box" style="max-width:620px;width:95%;text-align:left;max-height:85vh;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:17px;font-weight:700;color:var(--text);">🧱 JSON Mason — Help</div>
+        <div style="font-size:17px;font-weight:700;color:var(--text);">🧱 JSON Mason v0.3.0 — Help</div>
         <button class="modal-btn cancel" onclick="closeHelp()" style="padding:3px 10px;font-size:13px;">✕</button>
       </div>
       <div style="overflow-y:auto;flex:1;padding-right:4px;" class="help-scroll">
@@ -1337,6 +1380,22 @@
       <span class="ctx-label">Add child node</span>
       <span class="ctx-hint" id="ctx-add-hint"></span>
     </div>
+    <div class="ctx-item" id="ctx-insert-before" onclick="ctxInsertBefore()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+        <line x1="4" y1="6" x2="20" y2="6" stroke-dasharray="3 2"/>
+      </svg>
+      <span class="ctx-label">Insert before</span>
+    </div>
+    <div class="ctx-item" id="ctx-insert-after" onclick="ctxInsertAfter()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
+        <line x1="4" y1="18" x2="20" y2="18" stroke-dasharray="3 2"/>
+      </svg>
+      <span class="ctx-label">Insert after</span>
+    </div>
     <div class="ctx-sep"></div>
     <div class="ctx-item" onclick="ctxExpandGuarded()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1484,6 +1543,9 @@
     let clipboardBranch = null;
     let isDirty = false;
     let originalFileName = 'edited';
+    let undoStack = [];
+    let redoStack = [];
+    const MAX_UNDO = 50;
 
     // ---- Warning modal ----
     let warnCallback = null;
@@ -1502,6 +1564,48 @@
     function warnProceed() {
       document.getElementById('warn-modal').classList.add('hidden');
       if (warnCallback) { warnCallback(); warnCallback = null; }
+    }
+
+    // ---- Undo ----
+    function saveUndoState() {
+      if (!rootData) return;
+      undoStack.push(JSON.parse(JSON.stringify(rootData)));
+      if (undoStack.length > MAX_UNDO) undoStack.shift();
+      redoStack = [];  // new edit clears the redo chain
+      updateUndoButton();
+    }
+
+    function undoEdit() {
+      if (!undoStack.length) return;
+      redoStack.push(JSON.parse(JSON.stringify(rootData)));
+      rootData = undoStack.pop();
+      isDirty = undoStack.length > 0;
+      updateUndoButton();
+      updateSaveButton();
+      renderTree(rootData);
+    }
+
+    function redoEdit() {
+      if (!redoStack.length) return;
+      undoStack.push(JSON.parse(JSON.stringify(rootData)));
+      rootData = redoStack.pop();
+      isDirty = true;
+      updateUndoButton();
+      updateSaveButton();
+      renderTree(rootData);
+    }
+
+    function updateUndoButton() {
+      const undoBtn = document.getElementById('undo-btn');
+      const redoBtn = document.getElementById('redo-btn');
+      if (undoBtn) {
+        undoBtn.style.display = (rootData && undoStack.length > 0) ? '' : 'none';
+        undoBtn.textContent = `↩ Undo (${undoStack.length})`;
+      }
+      if (redoBtn) {
+        redoBtn.style.display = (rootData && redoStack.length > 0) ? '' : 'none';
+        redoBtn.textContent = `↪ Redo (${redoStack.length})`;
+      }
     }
 
     // ---- Prompt modal ----
@@ -1545,7 +1649,7 @@
     function estimateTime(nodeCount) {
       if (nodeCount < 3000) return 'fast';
       if (nodeCount < 10000) return 'a few seconds';
-      if (nodeCount < 50000) return '10–30 seconds';
+      if (nodeCount < 50000) return 'many seconds';
       return 'a very long time';
     }
 
@@ -1585,6 +1689,9 @@
           try {
             rootData = JSON.parse(e.target.result);
             isDirty = false;
+            undoStack = [];
+            redoStack = [];
+            updateUndoButton();
             updateSaveButton();
             progressFill.style.width = '90%';
             progressText.textContent = 'Rendering tree...';
@@ -1710,7 +1817,7 @@
           }
         };
 
-        if (depth < 2) { doRender(); }
+        if (depth < 1) { doRender(); }
         else {
           childrenEl.classList.add('collapsed');
           tog.innerHTML = '&#9654;';
@@ -1736,6 +1843,7 @@
             const parent = getDataAtPath(path.slice(0, -1));
             const k = path[path.length - 1];
             const newVal = !parent[k];   // read from model, not stale closure
+            saveUndoState();
             parent[k] = newVal;
             val.textContent = String(newVal);
             const entry = nodeMap.get(JSON.stringify(path));
@@ -1780,6 +1888,16 @@
       return typeof v;
     }
 
+    // ---- Inline edit sizing helper ----
+    // Uses a canvas to measure monospace text at the exact font used by .inline-edit,
+    // then adds 14px for the input's padding (6px × 2) and border (1px × 2).
+    function measureInlineText(text) {
+      const c = measureInlineText._c || (measureInlineText._c = document.createElement('canvas'));
+      const ctx = c.getContext('2d');
+      ctx.font = '13px Consolas, "Courier New", monospace';
+      return Math.ceil(ctx.measureText(text).width) + 14;
+    }
+
     // ---- Inline key editing ----
     function startInlineKeyEdit(kEl, path) {
       if (path.length === 0) return;
@@ -1790,7 +1908,7 @@
       const input = document.createElement('input');
       input.className = 'inline-edit key-edit';
       input.value = currentKey;
-      input.style.width = Math.max(60, currentKey.length * 9 + 20) + 'px';
+      input.style.width = Math.max(60, Math.ceil(kEl.getBoundingClientRect().width) + 14) + 'px';
 
       const row = kEl.closest('.node-row');
       if (row) row.classList.add('edit-active');
@@ -1818,6 +1936,7 @@
         const idx = entries.findIndex(([k]) => k === currentKey);
         if (idx === -1) { input.replaceWith(kEl); return; }
         entries[idx] = [newKey, entries[idx][1]];
+        saveUndoState();
         Object.keys(parent).forEach(k => delete parent[k]);
         entries.forEach(([k, v]) => { parent[k] = v; });
         markDirty();
@@ -1848,6 +1967,9 @@
       input.addEventListener('blur', commit);
       input.addEventListener('click', e => e.stopPropagation());
       input.addEventListener('dblclick', e => e.stopPropagation());
+      input.addEventListener('input', () => {
+        input.style.width = Math.max(60, measureInlineText(input.value)) + 'px';
+      });
 
       kEl.replaceWith(input);
       input.focus();
@@ -1865,23 +1987,42 @@
       const type = getType(currentData);
       if (type === 'null' || type === 'object' || type === 'array') return;
 
-      const input = document.createElement('input');
-      input.className = 'inline-edit val-' + type + '-edit';
       const strVal = String(currentData);
-      input.value = strVal;
-      input.style.width = Math.max(80, strVal.length * 8 + 30) + 'px';
-      if (type === 'number') input.type = 'text'; // keep as text so we can validate
+      const rect = valEl.getBoundingClientRect();
+      const isString = type === 'string';
+
+      // Strings get a textarea so wrapped text stays wrapped.
+      // Numbers get a plain input (they never wrap).
+      let editor;
+      if (isString) {
+        editor = document.createElement('textarea');
+        editor.className = 'inline-edit-area';
+        editor.value = strVal;
+        // Match the span's rendered dimensions exactly so there's no layout shift.
+        editor.style.width  = Math.max(80, Math.ceil(rect.width)  + 14) + 'px';
+        editor.style.height = Math.max(22, Math.ceil(rect.height) +  4) + 'px';
+      } else {
+        editor = document.createElement('input');
+        editor.className = 'inline-edit val-number-edit';
+        editor.type = 'text';
+        editor.value = strVal;
+        editor.style.width = Math.max(80, Math.ceil(rect.width) + 14) + 'px';
+      }
 
       const row = valEl.closest('.node-row');
-      if (row) row.classList.add('edit-active');
+      if (row) {
+        row.classList.add('edit-active');
+      }
 
       let done = false;
 
       const commit = () => {
         if (done) return;
         done = true;
-        if (row) row.classList.remove('edit-active');
-        const raw = input.value;
+        if (row) {
+          row.classList.remove('edit-active');
+        }
+        const raw = editor.value;
         let parsed;
         if (type === 'number') {
           const num = Number(raw);
@@ -1889,39 +2030,69 @@
         } else {
           parsed = raw;
         }
-        // No change — restore span as-is, no re-render needed
-        if (parsed === currentData) { input.replaceWith(valEl); return; }
+        // No change — restore span as-is, no re-render needed.
+        if (parsed === currentData) { editor.replaceWith(valEl); return; }
+        saveUndoState();
         parent[key] = parsed;
-        // Update the span in-place so the tree doesn't move at all
+        // Update the span in-place so the tree doesn't move at all.
         const newType = typeof parsed === 'number' ? 'number' : 'string';
         valEl.className = 'node-val val-' + newType + ' editable';
         valEl.textContent = String(parsed);
-        // Keep nodeMap in sync so search results stay accurate
+        // Keep nodeMap in sync so search results stay accurate.
         const entry = nodeMap.get(JSON.stringify(path));
         if (entry) entry.data = parsed;
         markDirty();
-        input.replaceWith(valEl);
+        editor.replaceWith(valEl);
       };
 
       const cancel = () => {
         if (done) return;
         done = true;
-        if (row) row.classList.remove('edit-active');
-        input.replaceWith(valEl);
+        if (row) {
+          row.classList.remove('edit-active');
+        }
+        editor.replaceWith(valEl);
       };
 
-      input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); commit(); }
-        if (e.key === 'Escape') { cancel(); }
+      editor.addEventListener('keydown', e => {
+        if (isString) {
+          // Ctrl/Cmd+Enter commits; plain Enter inserts a newline naturally.
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(); return; }
+          if (e.key === 'Escape') { cancel(); return; }
+        } else {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); return; }
+          if (e.key === 'Escape') { cancel(); return; }
+        }
         e.stopPropagation();
       });
-      input.addEventListener('blur', commit);
-      input.addEventListener('click', e => e.stopPropagation());
-      input.addEventListener('dblclick', e => e.stopPropagation());
+      editor.addEventListener('blur', commit);
+      editor.addEventListener('click', e => e.stopPropagation());
+      editor.addEventListener('dblclick', e => e.stopPropagation());
 
-      valEl.replaceWith(input);
-      input.focus();
-      input.select();
+      if (isString) {
+        editor.addEventListener('input', () => {
+          // Grow height to fit content.
+          editor.style.height = 'auto';
+          editor.style.height = editor.scrollHeight + 'px';
+          // Grow width to fit the longest line.
+          const longest = editor.value.split('\n').reduce((a, b) => a.length > b.length ? a : b, '');
+          editor.style.width = Math.max(80, measureInlineText(longest)) + 'px';
+        });
+      } else {
+        editor.addEventListener('input', () => {
+          editor.style.width = Math.max(80, measureInlineText(editor.value)) + 'px';
+        });
+      }
+
+      valEl.replaceWith(editor);
+      // Now that the textarea is in the DOM, scrollHeight is accurate.
+      // Recalculate height immediately so all text is visible before typing.
+      if (isString) {
+        editor.style.height = 'auto';
+        editor.style.height = editor.scrollHeight + 'px';
+      }
+      editor.focus();
+      editor.select();
     }
 
     // ---- Add/Edit Node Modal ----
@@ -1934,13 +2105,25 @@
       nmMode = mode;
       nmTargetPath = targetPath;
 
-      const title = mode === 'add' ? 'Add Child Node' : 'Edit Value';
+      const title = mode === 'add' ? 'Add Child Node'
+                   : mode === 'insert-before' ? 'Insert Before'
+                   : mode === 'insert-after'  ? 'Insert After'
+                   : 'Edit Value';
       document.getElementById('nm-title').textContent = title;
-      document.getElementById('nm-ok-btn').textContent = mode === 'add' ? 'Add' : 'Save';
+      document.getElementById('nm-ok-btn').textContent = (mode === 'add' || mode === 'insert-before' || mode === 'insert-after') ? 'Insert' : 'Save';
 
       // Decide whether key field is shown
-      const targetData = getDataAtPath(targetPath);
-      const showKeyField = mode === 'add' && !Array.isArray(targetData);
+      const isInsert = mode === 'insert-before' || mode === 'insert-after';
+      let targetData;
+      if (isInsert) {
+        // For insert modes, the parent determines whether a key is needed
+        const parentPath = targetPath.slice(0, -1);
+        targetData = parentPath.length === 0 ? rootData : getDataAtPath(parentPath);
+      } else {
+        targetData = getDataAtPath(targetPath);
+      }
+      const showKeyField = (mode === 'add' && !Array.isArray(targetData)) ||
+                           (isInsert && !Array.isArray(targetData));
       document.getElementById('nm-key-row').style.display = showKeyField ? '' : 'none';
       if (showKeyField) {
         document.getElementById('nm-key').value = '';
@@ -2049,6 +2232,7 @@
       }
 
       if (nmMode === 'add') {
+        saveUndoState();
         if (isArray) {
           targetData.push(newVal);
         } else {
@@ -2057,7 +2241,29 @@
           if (keyName in targetData) { alert(`Key "${keyName}" already exists.`); return; }
           targetData[keyName] = newVal;
         }
+      } else if (nmMode === 'insert-before' || nmMode === 'insert-after') {
+        const parentPath = nmTargetPath.slice(0, -1);
+        const parent = parentPath.length === 0 ? rootData : getDataAtPath(parentPath);
+        const siblingKey = nmTargetPath[nmTargetPath.length - 1];
+        if (Array.isArray(parent)) {
+          const idx = Number(siblingKey);
+          const insertIdx = nmMode === 'insert-before' ? idx : idx + 1;
+          saveUndoState();
+          parent.splice(insertIdx, 0, newVal);
+        } else {
+          const keyName = document.getElementById('nm-key').value.trim();
+          if (!keyName) { alert('Please enter a key name.'); return; }
+          if (keyName in parent) { alert(`Key "${keyName}" already exists.`); return; }
+          const entries = Object.entries(parent);
+          const idx = entries.findIndex(([k]) => k === String(siblingKey));
+          const insertIdx = nmMode === 'insert-before' ? idx : idx + 1;
+          saveUndoState();
+          entries.splice(insertIdx, 0, [keyName, newVal]);
+          Object.keys(parent).forEach(k => delete parent[k]);
+          entries.forEach(([k, v]) => { parent[k] = v; });
+        }
       } else if (nmMode === 'edit-val') {
+        saveUndoState();
         if (nmTargetPath.length === 0) {
           rootData = newVal;
         } else {
@@ -2103,6 +2309,10 @@
       // Cannot duplicate root
       document.getElementById('ctx-duplicate').classList.toggle('disabled', path.length === 0);
 
+      // Insert before/after: only non-root nodes
+      document.getElementById('ctx-insert-before').classList.toggle('disabled', path.length === 0);
+      document.getElementById('ctx-insert-after').classList.toggle('disabled', path.length === 0);
+
       // Rename key: only non-root, non-array-children
       const parentIsArray = path.length > 0 && Array.isArray(getDataAtPath(path.slice(0, -1)));
       document.getElementById('ctx-rename-key').classList.toggle('disabled', path.length === 0 || parentIsArray);
@@ -2125,11 +2335,15 @@
       else if (!isComplex) pasteHint.textContent = '(need array/object)';
       else pasteHint.textContent = type === 'array' ? '(append to array)' : '(add key to object)';
 
+      // Position horizontally, keeping within viewport
       const x = Math.min(e.clientX, window.innerWidth - 230);
-      const y = Math.min(e.clientY, window.innerHeight - 500);
       ctxMenu.style.left = x + 'px';
-      ctxMenu.style.top = y + 'px';
+      ctxMenu.style.top = '0px';
       ctxMenu.classList.add('visible');
+      // Now that the menu is visible we can measure its real height and clamp
+      const menuH = ctxMenu.offsetHeight;
+      const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+      ctxMenu.style.top = Math.max(8, y) + 'px';
     }
 
     function closeCtx() {
@@ -2141,6 +2355,8 @@
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') { closeCtx(); warnCancel(); promptCancel(); nmCancel(); closeSaveModal(); closeHelp(); }
       if (e.key === '?' && !e.target.matches('input,textarea')) { e.preventDefault(); openHelp(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey && !e.target.matches('input,textarea')) { e.preventDefault(); undoEdit(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || (e.key === 'z' && e.shiftKey)) && !e.target.matches('input,textarea')) { e.preventDefault(); redoEdit(); }
     });
 
     // ---- Context menu action handlers ----
@@ -2271,6 +2487,22 @@
       openNodeModal('add', path, data);
     }
 
+    function ctxInsertBefore() {
+      if (!ctxNode) return;
+      const { path } = ctxNode;
+      if (path.length === 0) return;
+      closeCtx();
+      openNodeModal('insert-before', path, null);
+    }
+
+    function ctxInsertAfter() {
+      if (!ctxNode) return;
+      const { path } = ctxNode;
+      if (path.length === 0) return;
+      closeCtx();
+      openNodeModal('insert-after', path, null);
+    }
+
     function ctxCopyBranch() {
       if (!ctxNode) return;
       clipboardBranch = JSON.parse(JSON.stringify(ctxNode.data));
@@ -2287,6 +2519,7 @@
       closeCtx();
 
       if (type === 'array') {
+        saveUndoState();
         data.push(JSON.parse(JSON.stringify(clipboardBranch)));
         markDirty();
         renderTree(rootData);
@@ -2295,6 +2528,7 @@
         let i = 1;
         while (defaultKey in data) { defaultKey = 'pasted_' + i; i++; }
         showPrompt('Paste branch', 'Enter the key name for the pasted branch:', defaultKey, (key) => {
+          saveUndoState();
           data[key] = JSON.parse(JSON.stringify(clipboardBranch));
           markDirty();
           renderTree(rootData);
@@ -2312,6 +2546,7 @@
       const key = path[path.length - 1];
       const dataCopy = JSON.parse(JSON.stringify(parent[key]));
 
+      saveUndoState();
       if (Array.isArray(parent)) {
         parent.splice(Number(key) + 1, 0, dataCopy);
       } else {
@@ -2338,12 +2573,13 @@
       const nodeCount = countNodes(data, undefined, 0);
       const keyLabel = path[path.length - 1];
       const msg = nodeCount > 1
-        ? `Delete <strong>"${keyLabel}"</strong> and its <strong>${nodeCount.toLocaleString()} nested nodes</strong>? This cannot be undone in this session.`
-        : `Delete <strong>"${keyLabel}"</strong>? This cannot be undone in this session.`;
+        ? `Delete <strong>"${keyLabel}"</strong> and its <strong>${nodeCount.toLocaleString()} nested nodes</strong>?`
+        : `Delete <strong>"${keyLabel}"</strong>?`;
 
       showWarning(msg, () => {
         const parent = getDataAtPath(path.slice(0, -1));
         const key = path[path.length - 1];
+        saveUndoState();
         if (Array.isArray(parent)) {
           parent.splice(Number(key), 1);
         } else {
@@ -2491,6 +2727,21 @@
       document.getElementById('save-filename').value = defaultFilename;
       document.getElementById('save-format-row').style.display = hideFormatPicker ? 'none' : '';
       saveModalCallback = onConfirm;
+
+      // Estimate file sizes for each format when the picker is shown
+      if (!hideFormatPicker && rootData) {
+        const prettyStr   = JSON.stringify(rootData, null, 2);
+        const compactStr  = JSON.stringify(rootData);
+        const prettySize  = new Blob([prettyStr]).size;
+        const compactSize = new Blob([compactStr]).size;
+        const savings     = Math.round((1 - compactSize / prettySize) * 100);
+        document.getElementById('save-size-pretty').textContent  = `≈ ${fmtSize(prettySize)}`;
+        document.getElementById('save-size-compact').textContent = `≈ ${fmtSize(compactSize)} (${savings}% smaller)`;
+      } else {
+        document.getElementById('save-size-pretty').textContent  = '';
+        document.getElementById('save-size-compact').textContent = '';
+      }
+
       document.getElementById('save-modal').classList.remove('hidden');
       setTimeout(() => {
         const inp = document.getElementById('save-filename');
