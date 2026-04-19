@@ -1140,6 +1140,13 @@
     </div>
     <div id="progress-text"></div>
     <input type="file" id="file-input" accept=".json,application/json">
+    <div id="start-build-row" style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:4px;">
+      <div style="font-size:12px;color:var(--text2);">or start building with</div>
+      <div style="display:flex;gap:10px;">
+        <button class="tb-btn" style="font-size:13px;padding:6px 18px;" onclick="startWith({})">{ } Empty object</button>
+        <button class="tb-btn" style="font-size:13px;padding:6px 18px;" onclick="startWith([])">[ ] Empty array</button>
+      </div>
+    </div>
   </div>
 
   <div id="toolbar">
@@ -1156,8 +1163,8 @@
     <div class="toolbar-sep"></div>
     <button class="tb-btn" onclick="loadNewFile()">&#128194; Open file</button>
     <button class="tb-btn" id="save-btn" onclick="saveEditedJson()" style="display:none">&#128190; Save JSON</button>
-    <button class="tb-btn" id="undo-btn" onclick="undoEdit()" style="display:none" title="Undo last edit (Ctrl+Z)">&#8617; Undo</button>
-    <button class="tb-btn" id="redo-btn" onclick="redoEdit()" style="display:none" title="Redo (Ctrl+Shift+Z)">&#8618; Redo</button>
+    <button class="tb-btn" id="undo-btn" onclick="undoEdit()" style="visibility:hidden" title="Undo last edit (Ctrl+Z)">&#8617; Undo</button>
+    <button class="tb-btn" id="redo-btn" onclick="redoEdit()" style="visibility:hidden" title="Redo (Ctrl+Shift+Z)">&#8618; Redo</button>
     <span id="file-info"></span>
     <button class="tb-btn" onclick="openHelp()" style="margin-left:4px;" title="Help & keyboard shortcuts">❓ Help</button>
   </div>
@@ -1214,7 +1221,7 @@
   <div id="help-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeHelp()">
     <div class="modal-box" style="max-width:620px;width:95%;text-align:left;max-height:85vh;display:flex;flex-direction:column;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:17px;font-weight:700;color:var(--text);">🧱 JSON Mason v0.3.0 — Help</div>
+        <div style="font-size:17px;font-weight:700;color:var(--text);">🧱 JSON Mason v0.4.0 — Help</div>
         <button class="modal-btn cancel" onclick="closeHelp()" style="padding:3px 10px;font-size:13px;">✕</button>
       </div>
       <div style="overflow-y:auto;flex:1;padding-right:4px;" class="help-scroll">
@@ -1328,6 +1335,15 @@
         <polyline points="14 2 14 8 20 8" />
       </svg>
       <span class="ctx-label">Save array as JSONL</span>
+      <span class="ctx-hint">(array only)</span>
+    </div>
+    <div class="ctx-item" id="ctx-save-array-json" onclick="ctxSaveBranch('json-array')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+        <polyline points="17 21 17 13 7 13 7 21" />
+        <polyline points="7 3 7 8 15 8" />
+      </svg>
+      <span class="ctx-label">Save array as JSON</span>
       <span class="ctx-hint">(array only)</span>
     </div>
     <div class="ctx-sep"></div>
@@ -1599,11 +1615,11 @@
       const undoBtn = document.getElementById('undo-btn');
       const redoBtn = document.getElementById('redo-btn');
       if (undoBtn) {
-        undoBtn.style.display = (rootData && undoStack.length > 0) ? '' : 'none';
+        undoBtn.style.visibility = (rootData && undoStack.length > 0) ? 'visible' : 'hidden';
         undoBtn.textContent = `↩ Undo (${undoStack.length})`;
       }
       if (redoBtn) {
-        redoBtn.style.display = (rootData && redoStack.length > 0) ? '' : 'none';
+        redoBtn.style.visibility = (rootData && redoStack.length > 0) ? 'visible' : 'hidden';
         redoBtn.textContent = `↪ Redo (${redoStack.length})`;
       }
     }
@@ -1674,6 +1690,19 @@
     });
 
     function loadNewFile() { fileInput.value = ''; fileInput.click(); }
+
+    function startWith(data) {
+      rootData = data;
+      isDirty = false;
+      undoStack = [];
+      redoStack = [];
+      originalFileName = 'edited';
+      updateUndoButton();
+      updateSaveButton();
+      document.getElementById('file-info').textContent = Array.isArray(data) ? 'New empty array' : 'New empty object';
+      renderTree(rootData);
+      dropZone.classList.add('hidden');
+    }
 
     function loadFile(file) {
       progressBar.classList.add('visible');
@@ -1940,17 +1969,10 @@
         Object.keys(parent).forEach(k => delete parent[k]);
         entries.forEach(([k, v]) => { parent[k] = v; });
         markDirty();
-        // Re-render is unavoidable (child event listeners close over old paths),
-        // but preserve scroll position and bring the renamed row into view.
-        const panel = document.getElementById('tree-panel');
-        const scrollTop = panel.scrollTop;
-        renderTree(rootData);
-        panel.scrollTop = scrollTop;
+        // Surgically rebuild just the parent so fresh closures capture the new key,
+        // then scroll the renamed row into view without collapsing the tree.
         const newPath = [...path.slice(0, -1), newKey];
-        const newPathStr = JSON.stringify(newPath);
-        const editedRow = [...document.querySelectorAll('[data-path]')]
-          .find(el => el.getAttribute('data-path') === newPathStr);
-        if (editedRow) editedRow.scrollIntoView({ block: 'nearest' });
+        repaintNode(path.slice(0, -1), newPath);
       };
 
       const cancel = () => {
@@ -2210,8 +2232,10 @@
     }
 
     function nmConfirm() {
-      const targetData = getDataAtPath(nmTargetPath);
-      const isArray = Array.isArray(targetData);
+      // For 'add' and insert modes we need the data at the target before mutating
+      const isEditVal = nmMode === 'edit-val';
+      const targetData = isEditVal ? null : getDataAtPath(nmTargetPath);
+      const isArray = !isEditVal && Array.isArray(targetData);
 
       // Build the new value
       let newVal;
@@ -2231,15 +2255,24 @@
         newVal = [];
       }
 
+      // repaintPath  — which node to surgically rebuild in the DOM
+      // scrollPath   — which path to scroll into view after the repaint
+      let repaintPath = null;
+      let scrollPath  = null;
+
       if (nmMode === 'add') {
         saveUndoState();
         if (isArray) {
           targetData.push(newVal);
+          repaintPath = nmTargetPath;
+          scrollPath  = [...nmTargetPath, targetData.length - 1];
         } else {
           const keyName = document.getElementById('nm-key').value.trim();
           if (!keyName) { alert('Please enter a key name.'); return; }
           if (keyName in targetData) { alert(`Key "${keyName}" already exists.`); return; }
           targetData[keyName] = newVal;
+          repaintPath = nmTargetPath;
+          scrollPath  = [...nmTargetPath, keyName];
         }
       } else if (nmMode === 'insert-before' || nmMode === 'insert-after') {
         const parentPath = nmTargetPath.slice(0, -1);
@@ -2250,6 +2283,8 @@
           const insertIdx = nmMode === 'insert-before' ? idx : idx + 1;
           saveUndoState();
           parent.splice(insertIdx, 0, newVal);
+          repaintPath = parentPath;
+          scrollPath  = [...parentPath, insertIdx];
         } else {
           const keyName = document.getElementById('nm-key').value.trim();
           if (!keyName) { alert('Please enter a key name.'); return; }
@@ -2261,20 +2296,28 @@
           entries.splice(insertIdx, 0, [keyName, newVal]);
           Object.keys(parent).forEach(k => delete parent[k]);
           entries.forEach(([k, v]) => { parent[k] = v; });
+          repaintPath = parentPath;
+          scrollPath  = [...parentPath, keyName];
         }
       } else if (nmMode === 'edit-val') {
         saveUndoState();
         if (nmTargetPath.length === 0) {
           rootData = newVal;
+          document.getElementById('node-modal').classList.add('hidden');
+          markDirty();
+          renderTree(rootData);
+          return;
         } else {
           const parent = getDataAtPath(nmTargetPath.slice(0, -1));
           parent[nmTargetPath[nmTargetPath.length - 1]] = newVal;
+          repaintPath = nmTargetPath.slice(0, -1);
+          scrollPath  = nmTargetPath;
         }
       }
 
       document.getElementById('node-modal').classList.add('hidden');
       markDirty();
-      renderTree(rootData);
+      if (repaintPath !== null) repaintNode(repaintPath, scrollPath);
     }
 
     // Allow Enter in nm-key to jump to value, Enter in nm-val to confirm
@@ -2302,6 +2345,7 @@
 
       // JSONL only for arrays
       document.getElementById('ctx-save-jsonl').classList.toggle('disabled', !Array.isArray(data));
+      document.getElementById('ctx-save-array-json').classList.toggle('disabled', !Array.isArray(data));
 
       // Cannot delete root
       document.getElementById('ctx-delete').classList.toggle('disabled', path.length === 0);
@@ -2365,17 +2409,23 @@
       const { data, path } = ctxNode;
       closeCtx();
 
-      if (format === 'jsonl' && !Array.isArray(data)) return;
+      if ((format === 'jsonl' || format === 'json-array') && !Array.isArray(data)) return;
 
       const name = path.length ? path[path.length - 1] : (originalFileName || 'root');
-      const defaultFilename = format === 'json' ? `${name}.json` : `${name}.jsonl`;
-      const mime = format === 'json' ? 'application/json' : 'application/x-ndjson';
       const isJsonl = format === 'jsonl';
+      const defaultFilename = isJsonl ? `${name}.jsonl` : `${name}.json`;
+      const mime = isJsonl ? 'application/x-ndjson' : 'application/json';
+
+      const modalTitle = isJsonl
+        ? 'Save Array as JSONL'
+        : format === 'json-array'
+          ? 'Save Array as JSON'
+          : 'Save Branch as JSON';
 
       openSaveModal(
-        isJsonl ? 'Save Array as JSONL' : 'Save Branch as JSON',
+        modalTitle,
         defaultFilename,
-        isJsonl,
+        isJsonl,      // hide format picker only for JSONL
         (filename, fmt) => {
           const pill = showToast('⏳', `Serializing ${filename}…`, '', '#888');
           setToastProgress(pill, 20);
@@ -2418,7 +2468,8 @@
               }
             }, 30);
           }, 30);
-        }
+        },
+        data    // pass branch data so the size preview reflects the branch, not the whole document
       );
     }
 
@@ -2520,9 +2571,10 @@
 
       if (type === 'array') {
         saveUndoState();
+        const newIdx = data.length;
         data.push(JSON.parse(JSON.stringify(clipboardBranch)));
         markDirty();
-        renderTree(rootData);
+        repaintNode(path, [...path, newIdx]);
       } else if (type === 'object') {
         let defaultKey = 'pasted';
         let i = 1;
@@ -2531,7 +2583,7 @@
           saveUndoState();
           data[key] = JSON.parse(JSON.stringify(clipboardBranch));
           markDirty();
-          renderTree(rootData);
+          repaintNode(path, [...path, key]);
         });
       }
     }
@@ -2547,8 +2599,12 @@
       const dataCopy = JSON.parse(JSON.stringify(parent[key]));
 
       saveUndoState();
+      const parentPath = path.slice(0, -1);
+      let scrollPath;
       if (Array.isArray(parent)) {
-        parent.splice(Number(key) + 1, 0, dataCopy);
+        const dupIdx = Number(key) + 1;
+        parent.splice(dupIdx, 0, dataCopy);
+        scrollPath = [...parentPath, dupIdx];
       } else {
         let newKey = key + '_copy';
         let i = 1;
@@ -2558,10 +2614,11 @@
         entries.splice(idx + 1, 0, [newKey, dataCopy]);
         Object.keys(parent).forEach(k => delete parent[k]);
         entries.forEach(([k, v]) => { parent[k] = v; });
+        scrollPath = [...parentPath, newKey];
       }
 
       markDirty();
-      renderTree(rootData);
+      repaintNode(parentPath, scrollPath);
     }
 
     function ctxDelete() {
@@ -2577,7 +2634,8 @@
         : `Delete <strong>"${keyLabel}"</strong>?`;
 
       showWarning(msg, () => {
-        const parent = getDataAtPath(path.slice(0, -1));
+        const parentPath = path.slice(0, -1);
+        const parent = parentPath.length === 0 ? rootData : getDataAtPath(parentPath);
         const key = path[path.length - 1];
         saveUndoState();
         if (Array.isArray(parent)) {
@@ -2586,7 +2644,7 @@
           delete parent[key];
         }
         markDirty();
-        renderTree(rootData);
+        repaintNode(parentPath, null);
       });
     }
 
@@ -2700,6 +2758,73 @@
       return cur;
     }
 
+    // ---- Surgical repaint: rebuild one node (and its subtree) in-place ----
+    // Replaces the .node element at `path` with a freshly built one so all
+    // event-listener closures capture correct paths after a structural mutation.
+    // Saves and restores expansion state; optionally scrolls a newly created item
+    // into view via scrollToPath.
+    function repaintNode(path, scrollToPath) {
+      const pathStr = JSON.stringify(path);
+      const entry = nodeMap.get(pathStr);
+      if (!entry) return;
+
+      // 1. Snapshot which nodes are currently expanded (process later in depth order)
+      const expandedBefore = new Set();
+      nodeMap.forEach((node, key) => {
+        if (node.isComplex && node.childrenEl &&
+            !node.childrenEl.classList.contains('collapsed')) {
+          expandedBefore.add(key);
+        }
+      });
+
+      // 2. Purge every nodeMap entry belonging to this subtree (inclusive)
+      const toDelete = [];
+      nodeMap.forEach((_, key) => {
+        const p = JSON.parse(key);
+        if (p.length >= path.length && path.every((v, i) => p[i] === v)) {
+          toDelete.push(key);
+        }
+      });
+      toDelete.forEach(k => nodeMap.delete(k));
+
+      // 3. Build a fresh replacement element (new closures, correct paths)
+      const data = path.length === 0 ? rootData : getDataAtPath(path);
+      const nodeKey = path.length > 0 ? path[path.length - 1] : null;
+      const depth = path.length;
+      const newEl = buildNode(data, nodeKey, path, depth);
+
+      // 4. Swap into the DOM
+      const oldNodeEl = entry.row.closest('.node');
+      if (oldNodeEl && oldNodeEl.parentElement) {
+        oldNodeEl.parentElement.insertBefore(newEl, oldNodeEl);
+        oldNodeEl.remove();
+      } else {
+        const treeRoot = document.getElementById('tree-root');
+        treeRoot.innerHTML = '';
+        treeRoot.appendChild(newEl);
+      }
+
+      // 5. Restore expansion — walk in ascending path-length order so parent
+      //    doRender() fires (populating children in nodeMap) before children are
+      //    expanded.
+      const sorted = [...expandedBefore]
+        .sort((a, b) => JSON.parse(a).length - JSON.parse(b).length);
+      sorted.forEach(key => {
+        const e = nodeMap.get(key);
+        if (e && e.isComplex && e.childrenEl &&
+            e.childrenEl.classList.contains('collapsed')) {
+          e.tog.click(); // runs doRender() then removes 'collapsed'
+        }
+      });
+
+      // 6. Scroll the requested path into view
+      if (scrollToPath) {
+        const target = nodeMap.get(JSON.stringify(scrollToPath));
+        if (target) target.row.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+
     function markDirty() {
       isDirty = true;
       updateSaveButton();
@@ -2722,21 +2847,19 @@
     let saveModalCallback = null;
     let saveFormat = 'pretty';
 
-    function openSaveModal(title, defaultFilename, hideFormatPicker, onConfirm) {
+    function openSaveModal(title, defaultFilename, hideFormatPicker, onConfirm, dataForPreview) {
       document.getElementById('save-modal-title').textContent = title;
       document.getElementById('save-filename').value = defaultFilename;
       document.getElementById('save-format-row').style.display = hideFormatPicker ? 'none' : '';
       saveModalCallback = onConfirm;
 
-      // Estimate file sizes for each format when the picker is shown
-      if (!hideFormatPicker && rootData) {
-        const prettyStr   = JSON.stringify(rootData, null, 2);
-        const compactStr  = JSON.stringify(rootData);
-        const prettySize  = new Blob([prettyStr]).size;
-        const compactSize = new Blob([compactStr]).size;
-        const savings     = Math.round((1 - compactSize / prettySize) * 100);
-        document.getElementById('save-size-pretty').textContent  = `≈ ${fmtSize(prettySize)}`;
-        document.getElementById('save-size-compact').textContent = `≈ ${fmtSize(compactSize)} (${savings}% smaller)`;
+      // Use explicitly supplied branch data, or fall back to the whole document
+      const previewData = (dataForPreview !== undefined) ? dataForPreview : rootData;
+
+      // Show the modal immediately with placeholder text so the user gets instant feedback
+      if (!hideFormatPicker && previewData !== null && previewData !== undefined) {
+        document.getElementById('save-size-pretty').textContent  = 'Calculating…';
+        document.getElementById('save-size-compact').textContent = 'Calculating…';
       } else {
         document.getElementById('save-size-pretty').textContent  = '';
         document.getElementById('save-size-compact').textContent = '';
@@ -2749,6 +2872,19 @@
         const dotIdx = inp.value.lastIndexOf('.');
         inp.setSelectionRange(0, dotIdx > 0 ? dotIdx : inp.value.length);
       }, 50);
+
+      // Defer the heavy JSON.stringify + Blob work so the modal renders first
+      if (!hideFormatPicker && previewData !== null && previewData !== undefined) {
+        setTimeout(() => {
+          const prettyStr   = JSON.stringify(previewData, null, 2);
+          const compactStr  = JSON.stringify(previewData);
+          const prettySize  = new Blob([prettyStr]).size;
+          const compactSize = new Blob([compactStr]).size;
+          const savings     = Math.round((1 - compactSize / prettySize) * 100);
+          document.getElementById('save-size-pretty').textContent  = `≈ ${fmtSize(prettySize)}`;
+          document.getElementById('save-size-compact').textContent = `≈ ${fmtSize(compactSize)} (${savings}% smaller)`;
+        }, 0);
+      }
     }
 
     function closeSaveModal() {
