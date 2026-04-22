@@ -12,8 +12,8 @@
 
 ### Reasons for building JSON Mason: 
 
-* Offline viewing and editing of sensitive JSON data.
-* Single HTML file has no dependencies. The source of the HTML file is human-readable and can be viewed in a text editor.
+* Offline viewing and editing of sensitive JSON data. No need to download (potentially malicious) programs from the Internet. 
+* Single HTML file has no dependencies. The source of the JSON Mason HTML file is human-readable and can be viewed in a text editor.
 * Most editors struggle with larger JSON files.
 
 ### Usage: 
