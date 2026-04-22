@@ -13,12 +13,12 @@
 ### Reasons for building JSON Mason: 
 
 * Offline viewing and editing of sensitive JSON data.
-* Single HTML file has no dependencies. Source can be viewed in a text editor.
+* Single HTML file has no dependencies. The source of the HTML file is human-readable and can be viewed in a text editor.
 * Most editors struggle with larger JSON files.
 
 ### Usage: 
 
-* Open jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file. Additional help is available in the app.
+* Run jsonmason.html (in browser). Drag/drop your JSON file or use file explorer to open JSON file. Additional help is available in the app.
 
 ### Screenshot: 
 
